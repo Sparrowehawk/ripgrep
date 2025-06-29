@@ -1,6 +1,6 @@
 use std::fs::{self};
 use anyhow::{Result, Context};
-use ignore::Walk;
+use ignore::{WalkBuilder, WalkState};
 use clap::Parser;
 use colored::Colorize;
 
@@ -33,35 +33,61 @@ fn main() -> Result<()> {
         .build()
         .with_context(|| "Could not compile regex")?;
 
+    let walk_buider = WalkBuilder::new(&args.path);
 
-    for entry in Walk::new(args.path)
-                .filter_map(Result::ok)
-                .filter(|e| {
-                    !ignores.iter().any(|i| e.path().ends_with(i))
-                })
-                .filter(|e| e.file_type().expect("REASON").is_file()){
-                    let path = fs::read_to_string(entry.path())
-                                   .with_context(|| format!("Failed to read from {}", entry.path().display()))?; 
+    walk_buider.build_parallel().run(|| {
+                let local_re = &re;
+                let local_args = &args;
 
-                    for (i, line) in path.lines().enumerate() {
-                        let is_match = re.is_match(line);
+                Box::new(move |result| {
+                    let entry = match result {
+                        Ok(entry) => entry,
+                        Err(err) => {
+                            eprint!("Error : {err}");
+                            return WalkState::Continue;
+                        }
+                    };
 
-                        if is_match ^ args.invert_match {
-                            if args.invert_match {
-                                println!("{}: {}: {}", entry.path().display().to_string().green(), i + 1, line);
-                            } else {
-                                let mat = re.find(line).unwrap();
-                                let start = mat.start();
-                                let end = mat.end();
+                    if ignores.iter().any(|i| entry.path().ends_with(i)){
+                        return WalkState::Continue
+                    }
 
-                                
-                                print!("{}: {}: {}", entry.path().display().to_string().green(), i + 1, &line[..start]);
-                                print!("{}", &line[start..end].blue().bold());
-                                println!("{}", &line[end..]);
+                    if !entry.file_type().is_some_and(|ft| ft.is_file()){
+                        return  WalkState::Continue;
+                    }
+
+
+                    if let Ok(contents) = fs::read_to_string(entry.path()){
+                        for (i, line) in contents.lines().enumerate(){
+                            let is_match = local_re.is_match(line);
+
+                            if is_match ^ local_args.invert_match {
+                                let out = if local_args.invert_match {
+                                    format!("{} : {} : {}", entry.path().display().to_string().green(), i+1, line)
+                                } else {
+                                    let mat = local_re.find(line).unwrap();
+                                    format!("{} : {} : {} {} {}", 
+                                            entry.path().display().to_string().green(),
+                                            i + 1,
+                                            &line[.. mat.start()],
+                                            &line[mat.start() .. mat.end()].blue().bold(),
+                                            &line[mat.end()..]
+                                        )
+                                };
+
+                                println!("{out}")
                             }
                         }
                     }
-                };
+
+                    WalkState::Continue
+                })
+                    
+                    
+                    
+            
+            
+            });
 
     Ok(())
 }
