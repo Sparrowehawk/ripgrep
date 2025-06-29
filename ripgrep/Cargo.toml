@@ -8,4 +8,5 @@ anyhow = "1.0.98"
 clap = { version = "4.5.40", features = ["derive"] }
 colored = "3.0.0"
 ignore = "0.4.23"
+rayon = "1.10.0"
 regex = "1.11.1"
