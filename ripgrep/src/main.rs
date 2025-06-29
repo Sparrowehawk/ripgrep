@@ -1,5 +1,4 @@
-use std::fs::File;
-use std::io::prelude::*;
+use std::fs::{self};
 
 use clap::Parser;
 
@@ -14,13 +13,15 @@ struct Cli {
 fn main() -> std::io::Result<()> {
     let args = Cli::parse();
     println!("Pattern is: {}", args.pattern);
-    println!("Path is: {:?}", args.path);
+    println!("Path is: {:?}\n", args.path);
 
-    let mut file = File::open(args.path)?;
-    let mut contents = String::new();
+    let contents = fs::read_to_string(&args.path)?;
 
-    file.read_to_string(&mut contents)?;
-    println!("{contents}");
+    for line in contents.lines() {
+        if line.contains(&args.pattern) {
+            println!("{line}");
+        }
+    }
 
     Ok(())
 }

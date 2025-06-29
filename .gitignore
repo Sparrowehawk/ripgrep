@@ -1,6 +1,6 @@
 # Ignore build output
 /target/
-
+target/
 # Ignore editor files
 **/*.rs.bk
 
